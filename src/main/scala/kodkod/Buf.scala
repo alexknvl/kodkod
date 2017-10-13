@@ -8,16 +8,16 @@ import scala.annotation.tailrec
   * O(N) map, copy
   */
 final class Buf[+A] private[kodkod]
-(private[this] var data: Array[Any],
- private[this] var front: Int,
- private[this] var rear: Int,
- private[this] var count: Int)
+(private var data: Array[Any],
+ private var front: Int,
+ private var rear: Int,
+ private var count: Int)
 {
   @inline private[this] def capacity: Int = data.length
   @inline private[this] def next(i: Int) = (i + 1) % capacity
   @inline private[this] def prev(i: Int) = (i - 1 + capacity) % capacity
 
-  def ensureCapacity(atLeast: Int): Unit = {
+  def ensureCapacity(atLeast: Int): ConsumesThis[Unit] = {
     val newCapacity = math.max(16, math.max(capacity, atLeast * 3 / 2))
     val newData = Array.ofDim[Any](newCapacity)
 
@@ -46,7 +46,7 @@ final class Buf[+A] private[kodkod]
   def last(implicit P: NonEmpty[this.type]): A =
     data(rear).asInstanceOf[A]
 
-  def +:[B >: A](item: B): Buf[B] = {
+  def +:[B >: A](item: B): ConsumesThis[Buf[B]] = {
     if (count == capacity)
       ensureCapacity(count + 1)
     count += 1
@@ -55,7 +55,7 @@ final class Buf[+A] private[kodkod]
     this
   }
 
-  def :+[B >: A](item: B): Buf[B] = {
+  def :+[B >: A](item: B): ConsumesThis[Buf[B]] = {
     if (count == capacity)
       ensureCapacity(count + 1)
     count += 1
@@ -64,21 +64,21 @@ final class Buf[+A] private[kodkod]
     this
   }
 
-  def uncons(implicit P: NonEmpty[this.type]): (A, Buf[A]) = {
+  def uncons(implicit P: NonEmpty[this.type]): ConsumesThis[(A, Buf[A])] = {
     val result = data(front)
     front = next(front)
     count -= 1
     (result.asInstanceOf[A], this)
   }
 
-  def unsnoc(implicit P: NonEmpty[this.type]): (Buf[A], A) = {
+  def unsnoc(implicit P: NonEmpty[this.type]): ConsumesThis[(Buf[A], A)] = {
     val result = data(rear)
     rear = prev(rear)
     count -= 1
     (this, result.asInstanceOf[A])
   }
 
-  def map[B](f: A => B): Buf[B] = {
+  def map[B](f: A => B): ConsumesThis[Buf[B]] = {
     @tailrec def go(counter: Int, i: Int): Unit = if (counter < count) {
       data(i) = f(data(i).asInstanceOf[A]).asInstanceOf[Any]
       go(counter + 1, next(i))
@@ -87,8 +87,8 @@ final class Buf[+A] private[kodkod]
     this.asInstanceOf[Buf[B]]
   }
 
-  def copy: Buf[A] =
-    new Buf(data.clone(), front, rear, size)
+  def widen[B >: A]: ConsumesThis[Buf[B]] =
+    new Buf(data, front, rear, size)
 
   def foreach[U](f: A => U)(implicit U: UseSideEffects): Unit = {
     @tailrec def go(counter: Int, i: Int): Unit = if (counter < count) {
@@ -116,6 +116,8 @@ final class Buf[+A] private[kodkod]
     sb.append(")")
     sb.toString
   }
+
+  override def equals(obj: Any): Boolean = throw new NotImplementedError()
 }
 object Buf {
   def apply[A](a: A*): Buf[A] =
@@ -130,4 +132,7 @@ object Buf {
       front = 0,
       rear = capacity - 1,
       count = 0)
+
+  def copyOf[A](buf: Buf[A]): Buf[A] =
+    new Buf(buf.data.clone(), buf.front, buf.rear, buf.size)
 }

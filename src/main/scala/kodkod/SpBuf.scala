@@ -10,10 +10,10 @@ import scala.{specialized => sp}
   * O(N) map, copy
   */
 final class SpBuf[@sp A] private[kodkod]
-(private[this] var data: Array[A],
- private[this] var front: Int,
- private[this] var rear: Int,
- private[this] var count: Int)
+(private var data: Array[A],
+ private var front: Int,
+ private var rear: Int,
+ private var count: Int)
 {
   private[this] implicit val classTag: ClassTag[A] =
     Utils.arrayClassTag(data).asInstanceOf[ClassTag[A]]
@@ -22,7 +22,7 @@ final class SpBuf[@sp A] private[kodkod]
   @inline private[this] def next(i: Int) = (i + 1) % capacity
   @inline private[this] def prev(i: Int) = (i - 1 + capacity) % capacity
 
-  def ensureCapacity(atLeast: Int): Unit = {
+  def ensureCapacity(atLeast: Int): ConsumesThis[Unit] = {
     val newCapacity = math.max(16, math.max(capacity, atLeast * 3 / 2))
     val newData = Array.ofDim[A](newCapacity)
 
@@ -49,7 +49,7 @@ final class SpBuf[@sp A] private[kodkod]
   def last(implicit P: NonEmpty[this.type]): A =
     data(rear)
 
-  def +:(item: A): SpBuf[A] = {
+  def +:(item: A): ConsumesThis[SpBuf[A]] = {
     if (count == capacity)
       ensureCapacity(count + 1)
     count += 1
@@ -58,7 +58,7 @@ final class SpBuf[@sp A] private[kodkod]
     this
   }
 
-  def :+(item: A): SpBuf[A] = {
+  def :+(item: A): ConsumesThis[SpBuf[A]] = {
     if (count == capacity)
       ensureCapacity(count + 1)
     count += 1
@@ -67,21 +67,21 @@ final class SpBuf[@sp A] private[kodkod]
     this
   }
 
-  def uncons(implicit P: NonEmpty[this.type]): (A, SpBuf[A]) = {
+  def uncons(implicit P: NonEmpty[this.type]): ConsumesThis[(A, SpBuf[A])] = {
     val result = data(front)
     front = next(front)
     count -= 1
     (result, this)
   }
 
-  def unsnoc(implicit P: NonEmpty[this.type]): (SpBuf[A], A) = {
+  def unsnoc(implicit P: NonEmpty[this.type]): ConsumesThis[(SpBuf[A], A)] = {
     val result = data(rear)
     rear = prev(rear)
     count -= 1
     (this, result)
   }
 
-  def map[B](f: A => B)(implicit B: ClassTag[B]): SpBuf[B] = {
+  def map[B](f: A => B)(implicit B: ClassTag[B]): ConsumesThis[SpBuf[B]] = {
     val newData: Array[B] =
       if (B.runtimeClass eq classTag.runtimeClass) data.asInstanceOf[Array[B]]
       else B.newArray(data.length)
@@ -96,8 +96,8 @@ final class SpBuf[@sp A] private[kodkod]
     this.asInstanceOf[SpBuf[B]]
   }
 
-  def copy: SpBuf[A] =
-    new SpBuf(data.clone(), front, rear, size)
+  def widen[B >: A](implicit B: ClassTag[B]): ConsumesThis[SpBuf[B]] =
+      new SpBuf(data.toArray[B](B), front, rear, size)
 
   def foreach[U](f: A => U)(implicit U: UseSideEffects): Unit = {
     @tailrec def go(counter: Int, i: Int): Unit = if (counter < count) {
@@ -125,6 +125,8 @@ final class SpBuf[@sp A] private[kodkod]
     sb.append(")")
     sb.toString
   }
+
+  override def equals(obj: Any): Boolean = throw new NotImplementedError()
 }
 object SpBuf {
   def apply[A](a: A*)(implicit A: ClassTag[A]): SpBuf[A] =
@@ -139,4 +141,7 @@ object SpBuf {
       front = 0,
       rear = capacity - 1,
       count = 0)
+
+  def copyOf[A](spBuf: SpBuf[A]): SpBuf[A] =
+    new SpBuf(spBuf.data.clone(), spBuf.front, spBuf.rear, spBuf.size)
 }

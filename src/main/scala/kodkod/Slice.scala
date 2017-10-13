@@ -91,6 +91,8 @@ final class Slice[@sp A] private[kodkod]
     sb.append(")")
     sb.toString
   }
+
+  override def equals(obj: Any): Boolean = throw new NotImplementedError()
 }
 object Slice {
   def apply[A](a: A*)(implicit A: ClassTag[A]): Slice[A] =
