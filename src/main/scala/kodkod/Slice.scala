@@ -1,5 +1,7 @@
 package kodkod
 
+import singleton.ops._
+
 import scala.annotation.tailrec
 import scala.reflect.ClassTag
 import scala.{specialized => sp}
@@ -44,6 +46,16 @@ final class Slice[@sp A] private[kodkod]
 
     new Slice(res, 0, size)
   }
+
+  type GoodIndex[x <: Int with Singleton] = Require[x < (end.type - start.type)]
+
+  def indices: DepRange[GoodIndex] =
+    DepRange.pi(new Pi[Int, GoodIndex] {
+      def apply(a: Int): GoodIndex[a.type] = null.asInstanceOf[GoodIndex[a.type]]
+    })(0, end - start)
+
+  def apply(index: Int)(implicit R: Require[index.type < (end.type - start.type)]): A =
+    data(start + index)
 
   def foreach[U](f: A => U)(implicit U: UseSideEffects): Unit = {
     @tailrec def go(i: Int): Unit = if (i < end) {

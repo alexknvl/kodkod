@@ -9,8 +9,8 @@ sealed abstract class Sigma[A, F[_ <: A with Singleton]] {
 object Sigma {
   def apply[A, F[_ <: A with Singleton]](a: A)(fa: F[a.type]): Sigma[A, F] =
     new Sigma[A, F] {
-      val first = a
-      val second = fa.asInstanceOf[F[first.type]]
+      val first: A = a
+      val second: F[first.type] = fa.asInstanceOf[F[first.type]]
     }
 
   def id[A](a: A): Sigma[A, Id] = Sigma[A, Id](a)(a)
